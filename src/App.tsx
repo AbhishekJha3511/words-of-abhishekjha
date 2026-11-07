@@ -864,12 +864,6 @@ export default function App() {
               <X />
             </button>
 
-            <p className="eyebrow">
-              YOUR POETRY · YOUR ARTWORK
-            </p>
-
-            <h2>{artworkPiece.title}</h2>
-
             {!artworkReady && (
               <p className="artwork-loading">
                 Creating your artwork…
