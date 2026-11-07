@@ -10,6 +10,9 @@ import {
   X,
   Download,
   Palette,
+  BookText,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 
 const SHEET_CSV_URL =
@@ -22,11 +25,11 @@ type Piece = {
   language: string;
   excerpt: string;
   body: string;
+  story: string;
   date: string;
   tags: string;
 };
 
-// CSV parser supports quoted commas, escaped quotes and multiline cells.
 function parseCSV(input: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
@@ -52,9 +55,7 @@ function parseCSV(input: string): string[][] {
       row.push(cell);
       cell = '';
 
-      if (row.some(value => value.trim())) {
-        rows.push(row);
-      }
+      if (row.some(value => value.trim())) rows.push(row);
 
       row = [];
     } else {
@@ -64,9 +65,7 @@ function parseCSV(input: string): string[][] {
 
   row.push(cell);
 
-  if (row.some(value => value.trim())) {
-    rows.push(row);
-  }
+  if (row.some(value => value.trim())) rows.push(row);
 
   return rows;
 }
@@ -75,7 +74,7 @@ function getField(
   row: string[],
   indexes: Record<string, number>,
   ...names: string[]
-) {
+): string {
   for (const name of names) {
     const index = indexes[name.toLowerCase()];
 
@@ -122,6 +121,7 @@ function mapSheetRows(csv: string): Piece[] {
           body.replace(/\s+/g, ' ').slice(0, 145) +
             (body.length > 145 ? '…' : ''),
         body,
+        story: getField(row, indexes, 'story', 'authorStory', 'writingStory'),
         date: getField(row, indexes, 'publishedAt', 'date'),
         tags: getField(row, indexes, 'tags'),
       };
@@ -129,13 +129,9 @@ function mapSheetRows(csv: string): Piece[] {
     .filter(piece => piece.title && piece.body);
 }
 
-// Draw a complete poetry artwork onto a 1080 x 1350 canvas.
-function drawPoetryArtwork(
-  canvas: HTMLCanvasElement,
-  piece: Piece
-) {
+// Generate 1080 x 1350 poetry artwork.
+function drawPoetryArtwork(canvas: HTMLCanvasElement, piece: Piece) {
   const ctx = canvas.getContext('2d');
-
   if (!ctx) return;
 
   const width = 1080;
@@ -144,11 +140,9 @@ function drawPoetryArtwork(
   canvas.width = width;
   canvas.height = height;
 
-  // Background
   ctx.fillStyle = '#f4eee3';
   ctx.fillRect(0, 0, width, height);
 
-  // Decorative border
   ctx.strokeStyle = '#cbb99d';
   ctx.lineWidth = 2;
   ctx.strokeRect(55, 55, width - 110, height - 110);
@@ -157,14 +151,12 @@ function drawPoetryArtwork(
   ctx.lineWidth = 1;
   ctx.strokeRect(70, 70, width - 140, height - 140);
 
-  // Top ornament
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
   ctx.fillStyle = '#a88965';
   ctx.font = '48px Georgia';
   ctx.fillText('✳', width / 2, 145);
 
-  // Brand
   ctx.fillStyle = '#9b7958';
   ctx.font = '600 19px Arial';
   ctx.fillText('ABHISHEK JHA', width / 2, 205);
@@ -177,15 +169,13 @@ function drawPoetryArtwork(
     245
   );
 
-  // Title with automatic wrapping
   ctx.fillStyle = '#40382d';
   ctx.font = '52px Georgia';
 
-  const titleWords = piece.title.split(/\s+/);
   const titleLines: string[] = [];
   let titleLine = '';
 
-  titleWords.forEach(word => {
+  piece.title.split(/\s+/).forEach(word => {
     const test = titleLine ? `${titleLine} ${word}` : word;
 
     if (ctx.measureText(test).width > 850 && titleLine) {
@@ -205,7 +195,6 @@ function drawPoetryArtwork(
     titleY += 65;
   });
 
-  // Divider
   const dividerY = Math.max(420, titleY + 20);
 
   ctx.strokeStyle = '#cbb99d';
@@ -214,7 +203,6 @@ function drawPoetryArtwork(
   ctx.lineTo(690, dividerY);
   ctx.stroke();
 
-  // Poetry text
   const poemTop = dividerY + 65;
   const signatureTop = 1170;
   const maxWidth = 820;
@@ -222,10 +210,8 @@ function drawPoetryArtwork(
 
   let fontSize = 34;
   let lineHeight = fontSize * 1.55;
-
   let lines: string[] = [];
 
-  // Wrap text and reduce font size if necessary.
   const makeLines = (size: number) => {
     ctx.font = `${size}px Georgia`;
 
@@ -256,13 +242,11 @@ function drawPoetryArtwork(
     return output;
   };
 
-  for (fontSize = 34; fontSize >= 19; fontSize -= 1) {
+  for (fontSize = 34; fontSize >= 19; fontSize--) {
     lineHeight = fontSize * 1.55;
     lines = makeLines(fontSize);
 
-    if (lines.length * lineHeight <= availableHeight) {
-      break;
-    }
+    if (lines.length * lineHeight <= availableHeight) break;
   }
 
   ctx.font = `${fontSize}px Georgia`;
@@ -271,18 +255,11 @@ function drawPoetryArtwork(
 
   let poemY = poemTop;
 
-  const maxLines = Math.max(
-    1,
-    Math.floor(availableHeight / lineHeight)
-  );
-
+  const maxLines = Math.max(1, Math.floor(availableHeight / lineHeight));
   const displayedLines = lines.slice(0, maxLines);
 
   displayedLines.forEach(line => {
-    if (line) {
-      ctx.fillText(line, width / 2, poemY, maxWidth);
-    }
-
+    if (line) ctx.fillText(line, width / 2, poemY, maxWidth);
     poemY += lineHeight;
   });
 
@@ -291,12 +268,10 @@ function drawPoetryArtwork(
     ctx.fillText('…', width / 2, poemY + 5);
   }
 
-  // Signature
   ctx.fillStyle = '#72583f';
   ctx.font = 'italic 48px cursive';
   ctx.fillText('Abhishek Jha', width / 2, signatureTop);
 
-  // Footer
   ctx.fillStyle = '#9a8c79';
   ctx.font = '13px Arial';
   ctx.fillText('WORDS THAT REMAIN', width / 2, 1220);
@@ -313,13 +288,15 @@ export default function App() {
   const [liked, setLiked] = useState<string[]>([]);
   const [mobile, setMobile] = useState(false);
 
-  // Artwork states
+  // Track which individual cards have their stories expanded.
+  const [expandedStories, setExpandedStories] = useState<string[]>([]);
+
   const [artworkPiece, setArtworkPiece] = useState<Piece | null>(null);
   const [artworkReady, setArtworkReady] = useState(false);
 
   const artworkCanvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Load published poetry from Google Sheets.
+  // Load published writing from Google Sheets.
   useEffect(() => {
     let cancelled = false;
 
@@ -335,7 +312,6 @@ export default function App() {
         if (cancelled) return;
 
         const published = mapSheetRows(csv);
-
         setItems(published);
 
         if (!published.length) {
@@ -360,7 +336,6 @@ export default function App() {
     };
   }, []);
 
-  // Categories
   const categories = useMemo(
     () => [
       'All',
@@ -369,18 +344,32 @@ export default function App() {
     [items]
   );
 
-  // Search and filter
+  // Search and category filter.
   const visible = useMemo(
     () =>
-      items.filter(
-        piece =>
-          (active === 'All' || piece.category === active) &&
-          `${piece.title} ${piece.excerpt} ${piece.language} ${piece.tags}`
+      items.filter(piece => {
+        const categoryMatches =
+          active === 'All' ||
+          piece.category.toLowerCase() === active.toLowerCase();
+
+        const searchMatches =
+          `${piece.title} ${piece.excerpt} ${piece.language} ${piece.tags} ${piece.story}`
             .toLowerCase()
-            .includes(query.toLowerCase())
-      ),
+            .includes(query.toLowerCase());
+
+        return categoryMatches && searchMatches;
+      }),
     [items, active, query]
   );
+
+  // Expand or collapse one story without affecting other cards.
+  const toggleStory = (id: string) => {
+    setExpandedStories(old =>
+      old.includes(id)
+        ? old.filter(itemId => itemId !== id)
+        : [...old, id]
+    );
+  };
 
   // Share a normal writing link.
   const share = async (piece: Piece) => {
@@ -398,10 +387,7 @@ export default function App() {
         alert('Writing link copied.');
       }
     } catch (error) {
-      if (
-        error instanceof Error &&
-        error.name !== 'AbortError'
-      ) {
+      if (error instanceof Error && error.name !== 'AbortError') {
         try {
           await navigator.clipboard.writeText(url);
           alert('Writing link copied.');
@@ -412,7 +398,6 @@ export default function App() {
     }
   };
 
-  // Open artwork preview and generate canvas.
   const openArtwork = (piece: Piece) => {
     setArtworkReady(false);
     setArtworkPiece(piece);
@@ -443,7 +428,6 @@ export default function App() {
     };
   }, [artworkPiece]);
 
-  // Download artwork as PNG.
   const downloadArtwork = () => {
     const canvas = artworkCanvasRef.current;
 
@@ -462,7 +446,6 @@ export default function App() {
     link.click();
   };
 
-  // Share actual PNG image through supported apps.
   const shareArtwork = async () => {
     const canvas = artworkCanvasRef.current;
 
@@ -499,16 +482,12 @@ export default function App() {
           });
         } else {
           downloadArtwork();
-
           alert(
             'Artwork downloaded. You can now upload it to Instagram or WhatsApp.'
           );
         }
       } catch (error) {
-        if (
-          error instanceof Error &&
-          error.name !== 'AbortError'
-        ) {
+        if (error instanceof Error && error.name !== 'AbortError') {
           alert(
             'Sharing is not available here. Please download the artwork.'
           );
@@ -519,7 +498,6 @@ export default function App() {
 
   return (
     <div className="site">
-      {/* Header */}
       <header className="topbar">
         <a className="brand" href="#">
           <span>ABHISHEK JHA</span>
@@ -538,11 +516,7 @@ export default function App() {
           {['Myself', 'Poetry', 'Sayings', 'Thoughts'].map(label => (
             <a
               key={label}
-              href={
-                label === 'Myself'
-                  ? '#myself'
-                  : `#${label.toLowerCase()}`
-              }
+              href={label === 'Myself' ? '#myself' : '#poetry'}
               onClick={() => {
                 setActive(label === 'Myself' ? 'All' : label);
                 setMobile(false);
@@ -564,12 +538,9 @@ export default function App() {
       </header>
 
       <main>
-        {/* Hero */}
         <section className="hero">
           <div className="hero-copy">
-            <p className="eyebrow">
-              POETRY · SAYINGS · THOUGHTS
-            </p>
+            <p className="eyebrow">POETRY · SAYINGS · THOUGHTS</p>
 
             <h1>
               Words that
@@ -589,13 +560,11 @@ export default function App() {
 
           <div className="hero-note">
             <span className="ornament">✳</span>
-
             <p>
               “Every page holds
               <br />
               a piece of a feeling.”
             </p>
-
             <small>— A NOTE TO THE READER</small>
           </div>
 
@@ -606,7 +575,6 @@ export default function App() {
           </div>
         </section>
 
-        {/* About */}
         <section className="about" id="myself">
           <p className="eyebrow">A NOTE ABOUT THIS SPACE</p>
 
@@ -623,12 +591,10 @@ export default function App() {
           </p>
         </section>
 
-        {/* Collection */}
         <section className="collection" id="poetry">
           <div className="section-head">
             <div>
               <p className="eyebrow">THE COLLECTION</p>
-
               <h2>
                 Words & <em>fragments</em>
               </h2>
@@ -636,7 +602,6 @@ export default function App() {
 
             <div className="search">
               <Search size={16} />
-
               <input
                 placeholder="Search writing…"
                 value={query}
@@ -649,7 +614,11 @@ export default function App() {
             {categories.map(category => (
               <button
                 key={category}
-                className={active === category ? 'active' : ''}
+                className={
+                  active.toLowerCase() === category.toLowerCase()
+                    ? 'active'
+                    : ''
+                }
                 onClick={() => setActive(category)}
               >
                 {category}
@@ -658,9 +627,7 @@ export default function App() {
           </div>
 
           {loading && (
-            <p className="feed-message">
-              Opening the collection…
-            </p>
+            <p className="feed-message">Opening the collection…</p>
           )}
 
           {!loading && feedError && (
@@ -668,72 +635,116 @@ export default function App() {
           )}
 
           <div className="cards">
-            {visible.map(piece => (
-              <article className="piece" key={piece.id}>
-                <div className="piece-topline">
-                  <span>{piece.category}</span>
-                  <span>{piece.language}</span>
-                </div>
+            {visible.map(piece => {
+              const storyIsOpen = expandedStories.includes(piece.id);
 
-                <div className="piece-content">
-                  <div className="meta">
-                    {piece.date || 'ABHISHEK JHA'}
+              return (
+                <article className="piece" key={piece.id}>
+                  <div className="piece-topline">
+                    <span>{piece.category}</span>
+                    <span>{piece.language}</span>
                   </div>
 
-                  <h3>{piece.title}</h3>
+                  <div className="piece-content">
+                    <div className="meta">
+                      {piece.date || 'ABHISHEK JHA'}
+                    </div>
 
-                  <p>{piece.excerpt}</p>
+                    <h3>{piece.title}</h3>
 
-                  <div className="piece-actions">
-                    <button onClick={() => setSelected(piece)}>
-                      READ MORE <ArrowUpRight size={14} />
-                    </button>
+                    <p>{piece.excerpt}</p>
 
-                    <div>
-                      <button
-                        className="artwork-action"
-                        aria-label="Create poetry artwork"
-                        title="Create shareable artwork"
-                        onClick={() => openArtwork(piece)}
+                    {/* Hidden story section */}
+                    {piece.story && (
+                      <div
+                        className={`story-section ${
+                          storyIsOpen ? 'story-open' : ''
+                        }`}
                       >
-                        <Palette size={16} />
-                        <span>ARTWORK</span>
+                        {storyIsOpen && (
+                          <div className="story-content">
+                            <div className="story-heading">
+                              <BookText size={17} />
+                              <span>THE STORY BEHIND THE WORDS</span>
+                            </div>
+
+                            <p>{piece.story}</p>
+
+                            <div className="story-signature">
+                              — Abhishek Jha
+                            </div>
+                          </div>
+                        )}
+
+                        <button
+                          className="story-toggle"
+                          onClick={() => toggleStory(piece.id)}
+                          aria-expanded={storyIsOpen}
+                        >
+                          {storyIsOpen ? (
+                            <>
+                              HIDE STORY <ChevronUp size={15} />
+                            </>
+                          ) : (
+                            <>
+                              READ STORY <ChevronDown size={15} />
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
+
+                    <div className="piece-actions">
+                      <button onClick={() => setSelected(piece)}>
+                        READ MORE <ArrowUpRight size={14} />
                       </button>
 
-                      <button
-                        aria-label="Like"
-                        className={
-                          liked.includes(piece.id) ? 'liked' : ''
-                        }
-                        onClick={() =>
-                          setLiked(old =>
-                            old.includes(piece.id)
-                              ? old.filter(id => id !== piece.id)
-                              : [...old, piece.id]
-                          )
-                        }
-                      >
-                        <Heart
-                          size={17}
-                          fill={
-                            liked.includes(piece.id)
-                              ? 'currentColor'
-                              : 'none'
+                      <div>
+                        <button
+                          className="artwork-action"
+                          aria-label="Create poetry artwork"
+                          title="Create shareable artwork"
+                          onClick={() => openArtwork(piece)}
+                        >
+                          <Palette size={16} />
+                          <span>ARTWORK</span>
+                        </button>
+
+                        <button
+                          aria-label="Like"
+                          className={
+                            liked.includes(piece.id) ? 'liked' : ''
                           }
-                        />
-                      </button>
+                          onClick={() =>
+                            setLiked(old =>
+                              old.includes(piece.id)
+                                ? old.filter(id => id !== piece.id)
+                                : [...old, piece.id]
+                            )
+                          }
+                        >
+                          <Heart
+                            size={17}
+                            fill={
+                              liked.includes(piece.id)
+                                ? 'currentColor'
+                                : 'none'
+                            }
+                          />
+                        </button>
 
-                      <button
-                        aria-label="Share writing link"
-                        onClick={() => share(piece)}
-                      >
-                        <Share2 size={17} />
-                      </button>
+                        <button
+                          aria-label="Share writing link"
+                          onClick={() => share(piece)}
+                        >
+                          <Share2 size={17} />
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </article>
-            ))}
+                </article>
+              );
+            })}
           </div>
 
           {!loading && !feedError && visible.length === 0 && (
@@ -743,20 +754,16 @@ export default function App() {
           )}
         </section>
 
-        {/* Quote */}
         <section className="quote">
           <BookOpen />
-
           <p>
             “The page remembers
             <br />
             what the world may never hear.”
           </p>
-
           <small>— ABHISHEK JHA</small>
         </section>
 
-        {/* Footer */}
         <footer>
           <div className="footer-brand">
             ABHISHEK JHA
@@ -776,7 +783,7 @@ export default function App() {
         </footer>
       </main>
 
-      {/* Read poetry modal */}
+      {/* Full poetry reader */}
       {selected && (
         <div
           className="modal-backdrop"
@@ -804,6 +811,18 @@ export default function App() {
 
             <div className="signature">Abhishek Jha</div>
 
+            {/* Story also available inside the full reader */}
+            {selected.story && (
+              <div className="reader-story">
+                <div className="story-heading">
+                  <BookText size={17} />
+                  <span>THE STORY BEHIND THE WORDS</span>
+                </div>
+                <p>{selected.story}</p>
+                <div className="story-signature">— Abhishek Jha</div>
+              </div>
+            )}
+
             <div className="reader-actions">
               <button
                 className="share-reader"
@@ -827,7 +846,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Poetry artwork modal */}
+      {/* Poetry artwork */}
       {artworkPiece && (
         <div
           className="modal-backdrop artwork-backdrop"
